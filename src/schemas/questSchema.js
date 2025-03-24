@@ -1,7 +1,7 @@
 const questSchema = {
   body: {
     type: 'object',
-    required: ['titulo', 'descripcion', 'ejercicios', 'jugadorId', 'fecha'],
+    required: ['titulo', 'descripcion', 'ejercicios'],
     properties: {
       titulo: { type: 'string' },
       descripcion: { type: 'string' },
@@ -9,16 +9,20 @@ const questSchema = {
         type: 'array',
         items: {
           type: 'object',
-          required: ['nombreDelEjercicio', 'cantidad', 'cumplido'],
+          required: ['nombreDelEjercicio', 'series', 'repeticiones', 'cumplido'],
           properties: {
             nombreDelEjercicio: { type: 'string' },
-            cantidad: { type: 'integer', minimum: 0 },
+            series: { type: 'integer', minimum: 0 },
+            repeticiones: { type: 'integer', minimum: 0 },
             cumplido: { type: 'boolean' }
           }
         }
       },
-      jugadorId: { type: 'string' },
-      fecha: { type: 'string', format: 'date-time' }
+      minNivel: { type: 'integer', minimum: 0 },
+      minFuerza: { type: 'integer', minimum: 0 },
+      minAgilidad: { type: 'integer', minimum: 0 },
+      minResistencia: { type: 'integer', minimum: 0 },
+      minInteligencia: { type: 'integer', minimum: 0 }
     }
   }
 };
@@ -35,16 +39,31 @@ const updateQuestSchema = {
           type: 'object',
           properties: {
             nombreDelEjercicio: { type: 'string' },
-            cantidad: { type: 'integer', minimum: 0 },
+            series: { type: 'integer', minimum: 0 },
+            repeticiones: { type: 'integer', minimum: 0 },
             cumplido: { type: 'boolean' }
           }
         }
       },
-      jugadorId: { type: 'string' },
-      fecha: { type: 'string', format: 'date-time' }
+      minNivel: { type: 'integer', minimum: 0 },
+      minFuerza: { type: 'integer', minimum: 0 },
+      minAgilidad: { type: 'integer', minimum: 0 },
+      minResistencia: { type: 'integer', minimum: 0 },
+      minInteligencia: { type: 'integer', minimum: 0 }
     }
   }
-  };
-  
-  module.exports = { questSchema, updateQuestSchema };
-  
+};
+
+module.exports = { questSchema, updateQuestSchema };
+
+// Validación de requisitos mínimos de estadísticas para activar una quest
+function validarRequisitosQuest(jugador, quest) {
+  return (
+    jugador.estadisticas.fuerza >= (quest.minFuerza || 0) &&
+    jugador.estadisticas.agilidad >= (quest.minAgilidad || 0) &&
+    jugador.estadisticas.resistencia >= (quest.minResistencia || 0) &&
+    jugador.estadisticas.inteligencia >= (quest.minInteligencia || 0)
+  );
+}
+
+module.exports = { questSchema, updateQuestSchema, validarRequisitosQuest };

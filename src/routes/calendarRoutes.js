@@ -4,14 +4,31 @@ const calendarSchema = require('../schemas/calendarSchema');
 async function calendarRoutes(fastify, options) {
   const db = fastify.mongo.db;
 
-  // 🔹 Obtener calendario del usuario autenticado
-  fastify.get('/calendar', { preValidation: [fastify.authenticate] }, async (request, reply) => {
+  // 🔹 Obtener calendarios
+  fastify.get('/calendar/all', { preValidation: [fastify.authenticate] }, async (request, reply) => {
     try {
       const calendar = await db.collection('calendar').find({ jugadorId: new ObjectId(request.user.jugadorId) }).toArray();
       return reply.send(calendar);
     } catch (error) {
       request.log.error(error);
       return reply.status(500).send({ error: "Error al obtener el calendario" });
+    }
+  });
+
+  // 🔹 Obtener el calendario de un jugador
+  fastify.get('/calendar/:jugadorId', { preValidation: [fastify.authenticate] }, async (request, reply) => {
+    try {
+      const { jugadorId } = request.params;
+      const calendarEntry = await db.collection('calendar').findOne({ jugadorId: new ObjectId(jugadorId) });
+
+      if (!calendarEntry) {
+        return reply.code(404).send({ error: "Calendario no encontrado para este jugador" });
+      }
+
+      reply.send(calendarEntry);
+    } catch (error) {
+      request.log.error(error);
+      reply.code(500).send({ error: "Error al obtener el calendario", details: error.message });
     }
   });
 
@@ -51,22 +68,7 @@ async function calendarRoutes(fastify, options) {
     }
   });
 
-  // 🔹 Obtener el calendario de un jugador
-  fastify.get('/calendar/:jugadorId', { preValidation: [fastify.authenticate] }, async (request, reply) => {
-    try {
-      const { jugadorId } = request.params;
-      const calendarEntry = await db.collection('calendar').findOne({ jugadorId: new ObjectId(jugadorId) });
-
-      if (!calendarEntry) {
-        return reply.code(404).send({ error: "Calendario no encontrado para este jugador" });
-      }
-
-      reply.send(calendarEntry);
-    } catch (error) {
-      request.log.error(error);
-      reply.code(500).send({ error: "Error al obtener el calendario", details: error.message });
-    }
-  });
+  
 
   // 🔹 Verificar si la quest diaria está completada
   fastify.post('/quests/:id/check', { preValidation: [fastify.authenticate] }, async (request, reply) => {

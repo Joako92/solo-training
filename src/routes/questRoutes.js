@@ -4,8 +4,19 @@ const { questSchema, updateQuestSchema } = require('../schemas/questSchema');
 async function questRoutes(fastify, options) {
   const db = fastify.mongo.db;
 
+  // 🔹 Obtener todas las quests
+  fastify.get('/quests/all', { preValidation: [fastify.authenticate] }, async (request, reply) => {
+    try {
+      const quests = await db.collection('quests').find().toArray();
+      reply.send(quests);
+    } catch (error) {
+      request.log.error(error);
+      reply.code(500).send({ error: "Error al obtener quests" });
+    }
+  });
+
   // 🔹 Obtener quests del jugador autenticado
-  fastify.get('/quests', { preValidation: [fastify.authenticate] }, async (request, reply) => {
+  fastify.get('/quests/player', { preValidation: [fastify.authenticate] }, async (request, reply) => {
     try {
       const quests = await db.collection('quests').find({ jugadorId: new ObjectId(request.user.jugadorId) }).toArray();
       return reply.send(quests);
@@ -21,28 +32,24 @@ async function questRoutes(fastify, options) {
     schema: questSchema 
   }, async (request, reply) => {
     try {
-      const quest = {
-        ...request.body,
-        _id: new ObjectId(),
-        jugadorId: new ObjectId(request.user.jugadorId) // Asociar al jugador autenticado
+      const { titulo, descripcion, ejercicios, minNivel, minFuerza, minAgilidad, minResistencia, minInteligencia } = request.body;
+      
+      const nuevaQuest = {
+        titulo,
+        descripcion,
+        ejercicios,
+        minNivel: minNivel || 0,
+        minFuerza: minFuerza || 0,
+        minAgilidad: minAgilidad || 0,
+        minResistencia: minResistencia || 0,
+        minInteligencia: minInteligencia || 0
       };
-
-      const result = await db.collection('quests').insertOne(quest);
-      reply.code(201).send({ message: "Quest creada", id: result.insertedId });
+      
+      const result = await db.collection('quests').insertOne(nuevaQuest);
+      reply.status(201).send({ message: "Quest creada con éxito", questId: result.insertedId });
     } catch (error) {
       request.log.error(error);
-      reply.code(500).send({ error: "Error al crear quest", details: error.message });
-    }
-  });
-
-  // 🔹 Obtener todas las quests (opcional, solo para administradores)
-  fastify.get('/quests/all', { preValidation: [fastify.authenticate] }, async (request, reply) => {
-    try {
-      const quests = await db.collection('quests').find().toArray();
-      reply.send(quests);
-    } catch (error) {
-      request.log.error(error);
-      reply.code(500).send({ error: "Error al obtener quests" });
+      reply.status(500).send({ error: "Error al crear la quest" });
     }
   });
 
@@ -103,12 +110,11 @@ async function questRoutes(fastify, options) {
   fastify.delete('/quests/:id', { preValidation: [fastify.authenticate] }, async (request, reply) => {
     try {
       const { id } = request.params;
-      const jugadorId = request.user.jugadorId;
 
-      const result = await db.collection('quests').deleteOne({ _id: new ObjectId(id), jugadorId: new ObjectId(jugadorId) });
+      const result = await db.collection('quests').deleteOne({ _id: new ObjectId(id) });
 
       if (result.deletedCount === 0) {
-        return reply.code(404).send({ error: "Quest no encontrada o no pertenece al usuario" });
+        return reply.code(404).send({ error: "Quest no encontrada" });
       }
 
       reply.send({ message: "Quest eliminada correctamente" });

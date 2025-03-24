@@ -1,7 +1,7 @@
 const playerSchema = {
   body: {
     type: 'object',
-    required: ['nombre', 'nivel', 'rango', 'titulo', 'racha', 'estadisticas'],
+    required: ['nombre', 'nivel', 'rango', 'titulo', 'racha', 'estadisticas', 'questDiaria', 'calendar'],
     properties: {
       nombre: { type: 'string' },
       nivel: { type: 'integer', minimum: 1 },
@@ -18,7 +18,10 @@ const playerSchema = {
           inteligencia: { type: 'integer', minimum: 0 },
           puntosParaRepartir: { type: 'integer', minimum: 0 }
         }
-      }
+      },
+      questDiaria: { type: 'string' },
+      questSecundaria: { type: 'string' },
+      calendar : { type: 'string' }
     }
   }
 };
@@ -41,7 +44,10 @@ const updatePlayerSchema = {
           inteligencia: { type: 'integer', minimum: 0 },
           puntosParaRepartir: { type: 'integer', minimum: 0 }
         }
-      }
+      },
+      questDiaria: { type: 'string' },
+      questSecundaria: { type: 'string' },
+      calendar : { type: 'string' }
     }
   }
 };
