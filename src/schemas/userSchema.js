@@ -1,9 +1,8 @@
 const userSchema = {
     body: {
       type: 'object',
-      required: ['nombre', 'email', 'password'],
+      required: ['email', 'password'],
       properties: {
-        nombre: { type: 'string', minLength: 3 },
         email: { type: 'string', format: 'email' },
         password: { type: 'string', minLength: 6 }
       }
@@ -25,7 +24,6 @@ const userSchema = {
     body: {
       type: 'object',
       properties: {
-        nombre: { type: 'string', minLength: 3 },
         email: { type: 'string', format: 'email' }
       },
       additionalProperties: false // Prohibir otros campos no especificados
