@@ -1,7 +1,7 @@
 const playerSchema = {
   body: {
     type: 'object',
-    required: ['nombre', 'nivel', 'rango', 'titulo', 'racha', 'estadisticas', 'questDiaria', 'calendar'],
+    required: ['nombre'],
     properties: {
       nombre: { type: 'string' },
       nivel: { type: 'integer', minimum: 1 },

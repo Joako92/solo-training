@@ -5,19 +5,43 @@ async function playerRoutes(fastify, options) {
   const db = fastify.mongo.db;
 
   // Ruta para insertar un nuevo jugador
-  fastify.post('/players', { schema: playerSchema }, async (request, reply) => {
+  fastify.post('/players', { schema: playerSchema, preValidation: [fastify.authenticate] }, async (request, reply) => {
     try {
-      const db = fastify.mongo.db;
-      const newPlayer = request.body;
-  
+      const { nombre, respuestas } = request.body;
+      const userId = request.user.userId; // Obtener el ID del usuario logueado
+
+      if (!nombre || !respuestas) {
+        return reply.code(400).send({ error: "Nombre y respuestas son requeridos" });
+      }
+      
+      const { fuerza, agilidad, resistencia, inteligencia, nivel, rango } = calcularEstadisticas(respuestas);
+      
+      const newPlayer = {
+        nombre,
+        nivel,
+        rango,
+        titulo: "El cazador más débil",
+        racha: 0,
+        estadisticas: { fuerza, agilidad, resistencia, inteligencia, puntosParaRepartir: 0 },
+        questDiaria: null,
+        questSecundaria: null,
+        calendar: []
+      };
+      
       const result = await db.collection('players').insertOne(newPlayer);
+
+      // Actualizar el usuario logueado con el nuevo jugadorId
+      await db.collection('users').updateOne(
+        { _id: new ObjectId(userId) },
+        { $set: { jugadorId: result.insertedId } } // Guardar el jugadorId en el usuario
+      );
+
       reply.code(201).send({ message: "Jugador creado", id: result.insertedId });
     } catch (error) {
       console.error("Error al insertar jugador:", error);
       reply.code(500).send({ error: "Error al insertar jugador", details: error.message });
     }
   });
-
 
 // Ruta para obtener un jugador por su ID
 fastify.get('/players/:id', async (request, reply) => {
@@ -90,5 +114,56 @@ fastify.delete('/players/:id', async (request, reply) => {
   });  
   
 }
+
+function calcularEstadisticas(respuestas) {
+  let fuerza = 0, agilidad = 0, resistencia = 0, inteligencia = 0;
+
+  // Evaluar fuerza
+  if (respuestas.pushUps > 40) fuerza += 5;
+  else if (respuestas.pushUps > 30) fuerza += 4;
+  else if (respuestas.pushUps > 20) fuerza += 3;
+  else if (respuestas.pushUps > 10) fuerza += 2;
+  else fuerza += 1;
+
+  if (respuestas.squats > 40) fuerza += 5;
+  else if (respuestas.squats > 30) fuerza += 4;
+  else if (respuestas.squats > 20) fuerza += 3;
+  else if (respuestas.squats > 10) fuerza += 2;
+  else fuerza += 1;
+
+  if (respuestas.crunches > 40) fuerza += 5;
+  else if (respuestas.crunches > 30) fuerza += 4;
+  else if (respuestas.crunches > 20) fuerza += 3;
+  else if (respuestas.crunches > 10) fuerza += 2;
+  else fuerza += 1;
+
+  // Evaluar resistencia
+  if (respuestas.tiempoCorriendo >= 30) resistencia += 5;
+  else if (respuestas.tiempoCorriendo >= 20) resistencia += 4;
+  else if (respuestas.tiempoCorriendo >= 10) resistencia += 3;
+  else if (respuestas.tiempoCorriendo >= 5) resistencia += 2;
+  else resistencia += 1;
+
+  if (!respuestas.fumador) resistencia += 3;
+
+  // Evaluar agilidad
+  if (respuestas.deportesAgiles) agilidad += 3;
+  if (respuestas.movimientosRapidos) agilidad += 3;
+
+  // Evaluar inteligencia (mentalidad ante el ejercicio)
+  if (respuestas.motivacion) inteligencia += 3;
+  if (respuestas.fatiga) inteligencia += 3;
+
+  const nivel = Math.floor((fuerza + agilidad + resistencia + inteligencia) / 4);
+  let rango = "E";
+  if (nivel >= 50) rango = "S";
+  else if (nivel >= 40) rango = "A";
+  else if (nivel >= 30) rango = "B";
+  else if (nivel >= 20) rango = "C";
+  else if (nivel >= 10) rango = "D";
+
+  return { fuerza, agilidad, resistencia, inteligencia, nivel, rango };
+}
+
 
 module.exports = playerRoutes;

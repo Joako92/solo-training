@@ -4,10 +4,16 @@ const calendarSchema = require('../schemas/calendarSchema');
 async function calendarRoutes(fastify, options) {
   const db = fastify.mongo.db;
 
-  // 🔹 Obtener calendarios
-  fastify.get('/calendar/all', { preValidation: [fastify.authenticate] }, async (request, reply) => {
+  // 🔹 Obtener todos los calendarios del jugador
+  fastify.get('/calendar', { preValidation: [fastify.authenticate] }, async (request, reply) => {
     try {
-      const calendar = await db.collection('calendar').find({ jugadorId: new ObjectId(request.user.jugadorId) }).toArray();
+      const userId = request.user.userId;
+      const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
+
+      const calendar = user.calendar;
+      if (!calendar) {
+        return reply.code(404).send({ error: "Calendario no encontrado para este jugador" });
+      }
       return reply.send(calendar);
     } catch (error) {
       request.log.error(error);
@@ -15,98 +21,45 @@ async function calendarRoutes(fastify, options) {
     }
   });
 
-  // 🔹 Obtener el calendario de un jugador
-  fastify.get('/calendar/:jugadorId', { preValidation: [fastify.authenticate] }, async (request, reply) => {
+  // 🔹 Cargar una entrada en el calendario
+  fastify.post('/calendar/entry', { preValidation: [fastify.authenticate], schema: calendarSchema }, async (request, reply) => {
     try {
-      const { jugadorId } = request.params;
-      const calendarEntry = await db.collection('calendar').findOne({ jugadorId: new ObjectId(jugadorId) });
+      const userId = request.user.userId;
+      const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
 
-      if (!calendarEntry) {
-        return reply.code(404).send({ error: "Calendario no encontrado para este jugador" });
+      if (!user || !user.calendar) {
+        return reply.status(400).send({ error: "El usuario no tiene un calendario asociado." });
       }
-
-      reply.send(calendarEntry);
-    } catch (error) {
-      request.log.error(error);
-      reply.code(500).send({ error: "Error al obtener el calendario", details: error.message });
-    }
-  });
-
-  // 🔹 Registrar un día en el calendario
-  fastify.post('/calendar', { 
-    preValidation: [fastify.authenticate], 
-    schema: calendarSchema 
-  }, async (request, reply) => {
-    try {
-      const { fecha, questCompletada } = request.body;
-      const jugadorId = request.user.jugadorId; // Se obtiene del token JWT
-
-      const existingEntry = await db.collection('calendar').findOne({
-        jugadorId: new ObjectId(jugadorId),
-        'calendario.fecha': new Date(fecha)
-      });
-
-      if (existingEntry) {
-        return reply.code(400).send({ error: "Ya existe un registro para esta fecha." });
-      }
-
-      const calendarEntry = {
-        fecha: new Date(fecha),
-        questCompletada
-      };
-
-      const result = await db.collection('calendar').findOneAndUpdate(
-        { jugadorId: new ObjectId(jugadorId) },
-        { $push: { calendario: calendarEntry } },
-        { upsert: true, returnOriginal: false }
-      );
-
-      reply.code(201).send({ message: "Registro de calendario actualizado", id: result.value?._id });
-    } catch (error) {
-      request.log.error(error);
-      reply.code(500).send({ error: "Error al registrar en el calendario", details: error.message });
-    }
-  });
-
-  
-
-  // 🔹 Verificar si la quest diaria está completada
-  fastify.post('/quests/:id/check', { preValidation: [fastify.authenticate] }, async (request, reply) => {
-    try {
-      const { id } = request.params;
-
-      const quest = await db.collection('quests').findOne({ _id: new ObjectId(id) });
-      if (!quest) {
-        return reply.code(404).send({ error: "Quest no encontrada" });
-      }
-
-      const questCompletada = quest.ejercicios.every(exercise => exercise.cumplido === true);
 
       const calendarEntry = {
         fecha: new Date(),
-        questCompletada
+        questCompletada: true
       };
 
-      await db.collection('calendar').findOneAndUpdate(
-        { jugadorId: new ObjectId(quest.jugadorId) },
-        { $push: { calendario: calendarEntry } },
+      // Agregar la entrada al calendario
+      await db.collection('calendar').updateOne(
+        { _id: user.calendar },
+        { $push: { calendar: calendarEntry } },
         { upsert: true }
       );
 
-      reply.send({ message: "Estado de la quest actualizado correctamente", questCompletada });
+      reply.send({ message: "Entrada de calendario agregada correctamente." });
     } catch (error) {
       request.log.error(error);
-      reply.code(500).send({ error: "Error al verificar quest", details: error.message });
+      return reply.status(500).send({ error: "Error al agregar entrada al calendario", details: error.message });
     }
   });
 
   // 🔹 Eliminar una entrada del calendario
-  fastify.delete('/calendar/:id', { preValidation: [fastify.authenticate] }, async (request, reply) => {
+  fastify.delete('/calendar/entry/:id', { preValidation: [fastify.authenticate] }, async (request, reply) => {
     try {
       const { id } = request.params;
-      const result = await db.collection('calendar').deleteOne({ _id: new ObjectId(id) });
+      const result = await db.collection('calendar').updateOne(
+        { jugadorId: new ObjectId(request.user.jugadorId) },
+        { $pull: { calendar: { _id: new ObjectId(id) } } } 
+      );
 
-      if (result.deletedCount === 0) {
+      if (result.modifiedCount === 0) {
         return reply.status(404).send({ error: "Entrada no encontrada" });
       }
 
